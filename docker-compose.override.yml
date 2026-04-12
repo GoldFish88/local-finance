@@ -1,0 +1,24 @@
+# Local development overrides — applied automatically by `docker compose up`.
+# Production deployments should run: docker compose -f docker-compose.yml up
+
+services:
+  nginx:
+    ports:
+      - "8080:8080"
+    volumes:
+      # Replace the production (SSL) nginx config with the HTTP-only dev config.
+      # Docker Compose merges volumes by container path, so this entry replaces
+      # the nginx.conf mount from docker-compose.yml without touching anything else.
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+
+  postgres:
+    ports:
+      # Expose postgres so you can connect directly (e.g. psql, DB GUI, local backend)
+      - "5432:5432"
+
+  backend:
+    ports:
+      # Expose backend directly for curl / API testing without going through nginx
+      - "8000:8000"
+    environment:
+      CORS_ORIGINS: "http://localhost:8080"

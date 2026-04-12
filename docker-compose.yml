@@ -1,0 +1,72 @@
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - 0.0.0.0:80:80
+      - 0.0.0.0:443:443
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
+    depends_on:
+      - frontend
+      - backend
+
+  backend:
+    build: ./backend
+    expose:
+      - 8000
+    env_file: .env
+    environment:
+      CORS_ORIGINS: "https://finance.guinto.org"
+    volumes:
+      - pdf_storage:/data/pdfs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./backend/app
+          target: /app/app
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: finance
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    expose:
+      - 5432
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U finance" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build: ./frontend
+    expose:
+      - 3000
+    depends_on:
+      backend:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      # Relative path ensures it always points to the NGINX /api route
+      # regardless of the domain you use.
+      NEXT_PUBLIC_API_URL: /api
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+
+volumes:
+  postgres_data:
+  pdf_storage:

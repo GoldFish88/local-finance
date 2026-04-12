@@ -1,0 +1,30 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+.cache/
+*.egg-info/
+dist/
+build/
+
+
+# Frontend
+node_modules/
+.next/
+frontend/.env.local
+
+# Docker
+postgres_data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+*.env*
+
+*.pdf
+*.zip
+.eslintcache
+
+backups/
