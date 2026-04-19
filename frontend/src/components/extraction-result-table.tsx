@@ -7,7 +7,6 @@ import type { ExtractionResult } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface Props {
   result: ExtractionResult
@@ -82,31 +81,19 @@ export function ExtractionResultTable({ result, onReset }: Props) {
           </Card>
         </div>
 
-        {/* Transaction table */}
+        {/* Transaction list */}
         <Card>
           <CardContent className="p-0">
-            <Table className="min-w-[600px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[110px]">Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right w-[140px]">Amount</TableHead>
-                  <TableHead className="text-right w-[140px]">Balance</TableHead>
-                  <TableHead className="w-[110px]">Source</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((txn, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {txn.date}
-                    </TableCell>
-                    <TableCell className="text-sm max-w-xs truncate" title={txn.description}>
+            <div className="divide-y">
+              {transactions.map((txn, i) => (
+                <div key={i} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-sm min-w-0 flex-1 truncate" title={txn.description}>
                       {txn.description}
-                    </TableCell>
-                    <TableCell
+                    </span>
+                    <span
                       className={cn(
-                        "text-right font-mono text-sm font-medium",
+                        "font-mono text-sm font-medium whitespace-nowrap shrink-0",
                         txn.amount < 0
                           ? "text-red-600 dark:text-red-400"
                           : "text-green-600 dark:text-green-400"
@@ -114,21 +101,23 @@ export function ExtractionResultTable({ result, onReset }: Props) {
                     >
                       {txn.amount < 0 ? "−" : "+"}
                       {formatAUD(txn.amount)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                      {txn.balance != null ? formatAUD(txn.balance) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={txn.extraction_method === "docling" ? "secondary" : "outline"}
-                      >
-                        {txn.extraction_method === "docling" ? "Docling" : "Vision"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-3 flex-wrap">
+                    <span className="font-mono text-xs text-muted-foreground">{txn.date}</span>
+                    {txn.balance != null && (
+                      <span className="font-mono text-xs text-muted-foreground">bal: {formatAUD(txn.balance)}</span>
+                    )}
+                    <Badge
+                      variant={txn.extraction_method === "docling" ? "secondary" : "outline"}
+                      className="text-xs"
+                    >
+                      {txn.extraction_method === "docling" ? "Docling" : "Vision"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 

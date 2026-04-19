@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { AlertCircle, ArrowLeft, ArrowUpDown, Check, Crosshair, Pencil, Plus, ScanSearch, Trash2, X } from "lucide-react"
+import { AlertCircle, ArrowLeft, Check, Crosshair, Pencil, Plus, ScanSearch, Trash2, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
 import type { Upload, StoredTransaction, Category, TxnBBox } from "@/lib/types"
@@ -12,14 +12,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PdfViewer } from "@/components/pdf-viewer"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 
 function formatAUD(amount: number) {
   if (!isFinite(amount)) return "—"
@@ -183,55 +175,61 @@ function AddRow({ form, onChange, onSave, onCancel, saving, hasBbox, onClearBbox
     }
   }
   return (
-    <TableRow className="bg-blue-50/60 dark:bg-blue-900/10">
-      <TableCell className="py-1 pr-1">
-        <Input type="text" value={formatDateForInput(form.date)} onChange={field("date")} placeholder="dd/mm/yyyy" className="h-7 w-[130px] text-xs px-2" />
-      </TableCell>
-      <TableCell className="py-1 px-1">
-        <Input value={form.description} onChange={field("description")} placeholder="Description" className="h-7 text-xs min-w-[120px]" />
-      </TableCell>
-      <TableCell className="py-1 px-1">
-        <Input type="number" step="0.01" value={form.amount} onChange={field("amount")} placeholder="0.00" className="h-7 w-[80px] text-xs text-right ml-auto" />
-      </TableCell>
-      <TableCell className="py-1 px-1">
-        <Input type="number" step="0.01" value={form.override_amount} onChange={field("override_amount")} placeholder="Optional" className="h-7 w-[80px] text-xs text-right ml-auto" />
-      </TableCell>
-      <TableCell className="py-1 px-1">
-        <Input type="number" step="0.01" value={form.balance} onChange={field("balance")} placeholder="Optional" className="h-7 w-[80px] text-xs text-right ml-auto" />
-      </TableCell>
-      <TableCell className="py-1 px-1">
-        <select
-          value={form.category_id || ""}
-          onChange={field("category_id")}
-          className="h-7 w-full rounded border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="">Uncategorised</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </TableCell>
-      <TableCell className="py-1 pl-1">
-        <div className="flex items-center gap-0.5">
-          <Button
-            size="icon"
-            variant="ghost"
-            className={cn("h-7 w-7 transition-colors", hasBbox ? "text-green-600" : "text-muted-foreground/40 hover:text-muted-foreground")}
-            onClick={hasBbox ? onClearBbox : undefined}
-            disabled={saving || !hasBbox}
-            title={hasBbox ? "Bbox drawn — click to clear" : "Drag on the PDF to draw a box"}
-          >
-            <Crosshair className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600 hover:text-green-700" onClick={onSave} disabled={saving} title="Save">
-            <Check className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={onCancel} disabled={saving} title="Cancel">
-            <X className="h-3.5 w-3.5" />
-          </Button>
+    <div className="bg-blue-50/60 dark:bg-blue-900/10 border-b px-3 py-2 space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-[10px] text-muted-foreground mb-0.5">Date</label>
+          <Input type="text" value={formatDateForInput(form.date)} onChange={field("date")} placeholder="dd/mm/yyyy" className="h-7 text-xs px-2" />
         </div>
-      </TableCell>
-    </TableRow>
+        <div>
+          <label className="block text-[10px] text-muted-foreground mb-0.5">Description</label>
+          <Input value={form.description} onChange={field("description")} placeholder="Description" className="h-7 text-xs" />
+        </div>
+        <div>
+          <label className="block text-[10px] text-muted-foreground mb-0.5">Amount</label>
+          <Input type="number" step="0.01" value={form.amount} onChange={field("amount")} placeholder="0.00" className="h-7 text-xs text-right" />
+        </div>
+        <div>
+          <label className="block text-[10px] text-muted-foreground mb-0.5">My Share</label>
+          <Input type="number" step="0.01" value={form.override_amount} onChange={field("override_amount")} placeholder="Optional" className="h-7 text-xs text-right" />
+        </div>
+        <div>
+          <label className="block text-[10px] text-muted-foreground mb-0.5">Balance</label>
+          <Input type="number" step="0.01" value={form.balance} onChange={field("balance")} placeholder="Optional" className="h-7 text-xs text-right" />
+        </div>
+        <div>
+          <label className="block text-[10px] text-muted-foreground mb-0.5">Category</label>
+          <select
+            value={form.category_id || ""}
+            onChange={field("category_id")}
+            className="h-7 w-full rounded border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <option value="">Uncategorised</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button
+          size="icon"
+          variant="ghost"
+          className={cn("h-7 w-7 transition-colors", hasBbox ? "text-green-600" : "text-muted-foreground/40 hover:text-muted-foreground")}
+          onClick={hasBbox ? onClearBbox : undefined}
+          disabled={saving || !hasBbox}
+          title={hasBbox ? "Bbox drawn — click to clear" : "Drag on the PDF to draw a box"}
+        >
+          <Crosshair className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600 hover:text-green-700" onClick={onSave} disabled={saving} title="Save">
+          <Check className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={onCancel} disabled={saving} title="Cancel">
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -269,7 +267,7 @@ export default function ReviewPage() {
   // PDF viewer — active/hovered transaction linkage
   const [activeTxnId, setActiveTxnId] = useState<string | null>(null)
   const [hoveredTxnId, setHoveredTxnId] = useState<string | null>(null)
-  const tableRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
+  const tableRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   // Bbox for the active add/edit row
   const [drawingBbox, setDrawingBbox] = useState<TxnBBox | null>(null)
@@ -392,26 +390,6 @@ export default function ReviewPage() {
 
   const busy = saving || deletingId !== null
   const router = useRouter()
-
-  const requestSort = (key: ReviewSortKey) => {
-    setSortConfig((prev) =>
-      prev?.key === key && prev.direction === "asc"
-        ? { key, direction: "desc" }
-        : { key, direction: "asc" }
-    )
-  }
-
-  const sortHead = (label: string, key: ReviewSortKey, right = false) => (
-    <TableHead
-      className={cn("cursor-pointer select-none py-2", right ? "text-right w-[110px]" : "")}
-      onClick={() => requestSort(key)}
-    >
-      <div className={cn("flex items-center gap-1 hover:text-foreground", right && "justify-end")}>
-        {label}
-        <ArrowUpDown className="h-3 w-3 opacity-50" />
-      </div>
-    </TableHead>
-  )
 
   // When a bbox on the PDF is clicked, scroll the matching table row into view
   function handleBboxClick(txnId: string) {
@@ -546,7 +524,7 @@ export default function ReviewPage() {
             })()}
           </div>
 
-          <div className="text-[10px] px-3 py-1.5 bg-muted/10 border-b flex gap-4 text-muted-foreground shrink-0 font-medium">
+          <div className="text-[10px] px-3 py-1.5 bg-muted/10 border-b flex flex-wrap gap-4 text-muted-foreground shrink-0 font-medium items-center">
             <span className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-[3px] bg-amber-50 dark:bg-amber-900/50 border border-amber-200 dark:border-amber-800" />
               Needs review
@@ -555,189 +533,181 @@ export default function ReviewPage() {
               <div className="w-2.5 h-2.5 rounded-[3px] bg-neutral-100 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700" />
               Low confidence match
             </span>
+            <select
+              value={sortConfig ? `${sortConfig.key}-${sortConfig.direction}` : ""}
+              onChange={(e) => {
+                if (!e.target.value) { setSortConfig(null); return; }
+                const parts = e.target.value.split("-");
+                const dir = parts.pop() as "asc" | "desc";
+                const key = parts.join("-") as ReviewSortKey;
+                setSortConfig({ key, direction: dir });
+              }}
+              className="ml-auto h-6 rounded border border-input bg-background px-2 text-[10px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="">Sort: Default</option>
+              <option value="date-desc">Date (newest)</option>
+              <option value="date-asc">Date (oldest)</option>
+              <option value="amount-asc">Amount (low→high)</option>
+              <option value="amount-desc">Amount (high→low)</option>
+              <option value="description-asc">Description (A–Z)</option>
+              <option value="category-asc">Category (A–Z)</option>
+            </select>
           </div>
 
           <div className={cn("flex-1 overflow-auto transition-[padding]", isAdding && "pb-[148px]")}>
             {loading ? (
               <div className="p-3 space-y-2">
                 {[...Array(10)].map((_, i) => (
-                  <Skeleton key={i} className="h-8 w-full" />
+                  <Skeleton key={i} className="h-16 w-full" />
                 ))}
               </div>
             ) : (
-              <Table className="min-w-[800px]">
-                <TableHeader>
-                  <TableRow className="text-xs">
-                    {sortHead("Date", "date")}
-                    {sortHead("Description", "description")}
-                    {sortHead("Amount", "amount", true)}
-                    <TableHead className="text-right w-[100px] py-2">My Share</TableHead>
-                    <TableHead className="text-right w-[110px] py-2">Balance</TableHead>
-                    {sortHead("Category", "category")}
-                    <TableHead className="w-[36px] py-2" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(() => {
-                    const txns = (() => {
-                      const base = transactions ?? []
-                      if (!sortConfig) return base
-                      return [...base].sort((a, b) => {
-                        const aVal: string | number = sortConfig.key === "amount" ? a.amount
-                          : sortConfig.key === "category" ? (a.category_name ?? "")
-                            : (a[sortConfig.key as "date" | "description"] ?? "")
-                        const bVal: string | number = sortConfig.key === "amount" ? b.amount
-                          : sortConfig.key === "category" ? (b.category_name ?? "")
-                            : (b[sortConfig.key as "date" | "description"] ?? "")
-                        if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1
-                        if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1
-                        return 0
-                      })
-                    })()
+              <div className="divide-y">
+                {(() => {
+                  const txns = (() => {
+                    const base = transactions ?? []
+                    if (!sortConfig) return base
+                    return [...base].sort((a, b) => {
+                      const aVal: string | number = sortConfig.key === "amount" ? a.amount
+                        : sortConfig.key === "category" ? (a.category_name ?? "")
+                          : (a[sortConfig.key as "date" | "description"] ?? "")
+                      const bVal: string | number = sortConfig.key === "amount" ? b.amount
+                        : sortConfig.key === "category" ? (b.category_name ?? "")
+                          : (b[sortConfig.key as "date" | "description"] ?? "")
+                      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1
+                      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1
+                      return 0
+                    })
+                  })()
 
-                    if (txns.length === 0 && !isAdding) {
+                  if (txns.length === 0 && !isAdding) {
+                    return (
+                      <div className="text-center text-muted-foreground py-16 text-sm">
+                        No transactions — click Add to create one
+                      </div>
+                    )
+                  }
+
+                  return txns.map((txn) => {
+                    const isDeleting = deletingId === txn.id
+                    const needsReview = txn.status === "pending_review"
+                    const lowConfidence = txn.status === "auto_classified" && typeof txn.similarity_score === "number" && txn.similarity_score < 0.5
+                    const isActive = activeTxnId === txn.id
+                    const isHovered = hoveredTxnId === txn.id
+                    const amt = txn.amount
+
+                    if (editingRowId === txn.id && editForm) {
                       return (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground py-16 text-sm">
-                            No transactions — click Add to create one
-                          </TableCell>
-                        </TableRow>
+                        <AddRow
+                          key={txn.id}
+                          form={editForm}
+                          onChange={setEditForm}
+                          onSave={() => saveEdit(txn.id)}
+                          onCancel={() => { setEditingRowId(null); setEditForm(null); setDrawingBbox(null); setMutationError(null) }}
+                          saving={saving}
+                          hasBbox={drawingBbox !== null}
+                          onClearBbox={() => setDrawingBbox(null)}
+                          categories={categories}
+                        />
                       )
                     }
 
-                    return txns.map((txn) => {
-                      const isDeleting = deletingId === txn.id
-                      const needsReview = txn.status === "pending_review"
-                      const lowConfidence = txn.status === "auto_classified" && typeof txn.similarity_score === "number" && txn.similarity_score < 0.5
-                      const isActive = activeTxnId === txn.id
-                      const isHovered = hoveredTxnId === txn.id
-                      const amt = txn.amount
-
-                      if (editingRowId === txn.id && editForm) {
-                        return (
-                          <AddRow
-                            key={txn.id}
-                            form={editForm}
-                            onChange={setEditForm}
-                            onSave={() => saveEdit(txn.id)}
-                            onCancel={() => { setEditingRowId(null); setEditForm(null); setDrawingBbox(null); setMutationError(null) }}
-                            saving={saving}
-                            hasBbox={drawingBbox !== null}
-                            onClearBbox={() => setDrawingBbox(null)}
-                            categories={categories}
-                          />
-                        )
-                      }
-
-                      return (
-                        <TableRow
-                          key={txn.id}
-                          ref={(el) => { tableRowRefs.current[txn.id] = el }}
-                          className={cn(
-                            "text-xs group",
-                            isDeleting && "opacity-40 pointer-events-none",
-                            isActive && "ring-1 ring-inset ring-amber-400",
-                            isHovered && !isActive && "bg-amber-50/40 dark:bg-amber-900/10",
-                            needsReview && "bg-amber-50/60 dark:bg-amber-900/10",
-                            lowConfidence && !needsReview && "bg-neutral-100/50 dark:bg-neutral-800/30",
-                          )}
-                          onMouseEnter={() => { if (!isAdding) { setHoveredTxnId(txn.id); setActiveTxnId(txn.id) } }}
-                          onMouseLeave={() => { if (!isAdding) setHoveredTxnId(null) }}
-                        >
-                          {/* Date */}
-                          <TableCell className="font-mono text-muted-foreground whitespace-nowrap py-1.5 pl-3 pr-1">
-                            {formatTxnDate(txn.date)}
-                          </TableCell>
-
-                          {/* Description */}
-                          <TableCell className="py-1.5 px-3 max-w-[200px]">
-                            <span className="truncate block" title={txn.description}>{txn.description}</span>
-                          </TableCell>
-
-                          {/* Amount */}
-                          <TableCell className="text-right py-1.5 px-1">
+                    return (
+                      <div
+                        key={txn.id}
+                        ref={(el) => { tableRowRefs.current[txn.id] = el }}
+                        className={cn(
+                          "px-3 py-2.5 group",
+                          isDeleting && "opacity-40 pointer-events-none",
+                          isActive && "ring-1 ring-inset ring-amber-400",
+                          isHovered && !isActive && "bg-amber-50/40 dark:bg-amber-900/10",
+                          needsReview && "bg-amber-50/60 dark:bg-amber-900/10",
+                          lowConfidence && !needsReview && "bg-neutral-100/50 dark:bg-neutral-800/30",
+                        )}
+                        onMouseEnter={() => { if (!isAdding) { setHoveredTxnId(txn.id); setActiveTxnId(txn.id) } }}
+                        onMouseLeave={() => { if (!isAdding) setHoveredTxnId(null) }}
+                      >
+                        {/* Top row: description + amount + actions */}
+                        <div className="flex items-start gap-2">
+                          <p className="text-xs min-w-0 flex-1 truncate" title={txn.description}>
+                            {txn.description}
+                          </p>
+                          <div className="shrink-0 text-right">
                             <span className={cn(
-                              "font-mono font-medium whitespace-nowrap",
+                              "font-mono text-xs font-medium whitespace-nowrap",
                               !isFinite(amt) ? "text-amber-600" : amt < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
                             )}>
                               {!isFinite(amt) ? "—" : `${amt < 0 ? "−" : "+"}${formatAUD(amt)}`}
                             </span>
-                          </TableCell>
-
-                          {/* My Share */}
-                          <TableCell className="text-right py-1.5 px-1">
-                            {txn.override_amount !== null ? (
-                              <span className={cn(
-                                "font-mono font-medium whitespace-nowrap",
+                            {txn.override_amount !== null && (
+                              <p className={cn(
+                                "font-mono text-[10px] whitespace-nowrap",
                                 txn.override_amount < 0 ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"
                               )}>
-                                {txn.override_amount < 0 ? "−" : "+"}{formatAUD(txn.override_amount)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground/40">—</span>
+                                share: {txn.override_amount < 0 ? "−" : "+"}{formatAUD(txn.override_amount)}
+                              </p>
                             )}
-                          </TableCell>
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 text-muted-foreground hover:text-blue-600"
+                              onClick={() => startEdit(txn)}
+                              disabled={busy || isAdding || editingRowId !== null}
+                              title="Edit row"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDelete(txn.id)}
+                              disabled={busy || isAdding || editingRowId !== null}
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        {/* Bottom row: date + balance + category */}
+                        <div className="mt-1 flex items-center gap-3 flex-wrap">
+                          <span className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">
+                            {formatTxnDate(txn.date)}
+                          </span>
+                          {txn.balance != null && (
+                            <span className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">
+                              bal: {formatAUD(txn.balance)}
+                            </span>
+                          )}
+                          {txn.category_name ? (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs border-transparent"
+                              style={(() => {
+                                const color = txn.category_id ? categoryMap[txn.category_id]?.color : null
+                                return color ? { backgroundColor: hexToRgba(color, 0.15), color } : undefined
+                              })()}
+                            >
+                              {txn.category_name}
+                            </Badge>
+                          ) : (
+                            <span className={cn(
+                              "text-[10px] font-medium",
+                              txn.status === "pending_review" ? "text-amber-600" : "text-muted-foreground/50",
+                            )}>
+                              {txn.status === "pending_review" ? "Review" : "—"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()
+                }
 
-                          {/* Balance */}
-                          <TableCell className="text-right font-mono text-muted-foreground py-1.5 px-1">
-                            {txn.balance != null ? formatAUD(txn.balance) : "—"}
-                          </TableCell>
-
-                          {/* Category */}
-                          <TableCell className="py-1.5 px-1">
-                            {txn.category_name ? (
-                              <Badge
-                                variant="secondary"
-                                className="text-xs border-transparent"
-                                style={(() => {
-                                  const color = txn.category_id ? categoryMap[txn.category_id]?.color : null
-                                  return color ? { backgroundColor: hexToRgba(color, 0.15), color } : undefined
-                                })()}
-                              >
-                                {txn.category_name}
-                              </Badge>
-                            ) : (
-                              <span className={cn(
-                                "text-xs font-medium",
-                                txn.status === "pending_review" ? "text-amber-600" : "text-muted-foreground/50",
-                              )}>
-                                {txn.status === "pending_review" ? "Review" : "—"}
-                              </span>
-                            )}
-                          </TableCell>
-
-                          {/* Actions: Edit + Delete */}
-                          <TableCell className="py-1.5 pl-0 pr-2">
-                            <div className="flex items-center justify-end">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-blue-600"
-                                onClick={() => startEdit(txn)}
-                                disabled={busy || isAdding || editingRowId !== null}
-                                title="Edit row"
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDelete(txn.id)}
-                                disabled={busy || isAdding || editingRowId !== null}
-                                title="Delete"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
-                  })()}
-
-                </TableBody>
-              </Table>
+              </div>
             )}
           </div>
 

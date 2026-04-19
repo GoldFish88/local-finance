@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
 import type { ReuploadPreviewResponse } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 function formatAUD(n: number) {
     if (!isFinite(n)) return "—"
@@ -226,51 +225,37 @@ export default function ReuploadPage() {
                             <h2 className="text-sm font-semibold">
                                 New transactions that will be added ({preview.new_count})
                             </h2>
-                            <div className="rounded-lg border overflow-hidden">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow className="text-xs bg-muted/30">
-                                            <TableHead className="py-2">Date</TableHead>
-                                            <TableHead className="py-2">Description</TableHead>
-                                            <TableHead className="text-right py-2 w-[110px]">Amount</TableHead>
-                                            <TableHead className="text-right py-2 w-[110px]">Balance</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {preview.new_transactions.map((txn) => {
-                                            const amt = Number(txn.amount)
-                                            const bal = txn.balance !== null ? Number(txn.balance) : null
-                                            return (
-                                                <TableRow key={txn.dedup_hash} className="text-xs">
-                                                    <TableCell className="font-mono text-muted-foreground py-1.5 whitespace-nowrap">
-                                                        {formatDate(String(txn.date))}
-                                                    </TableCell>
-                                                    <TableCell className="py-1.5 max-w-[280px]">
-                                                        <span className="truncate block" title={txn.description}>
-                                                            {txn.description}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell className="text-right py-1.5">
-                                                        <span
-                                                            className={cn(
-                                                                "font-mono font-medium whitespace-nowrap",
-                                                                amt < 0
-                                                                    ? "text-red-600 dark:text-red-400"
-                                                                    : "text-green-600 dark:text-green-400"
-                                                            )}
-                                                        >
-                                                            {amt < 0 ? "−" : "+"}
-                                                            {formatAUD(amt)}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell className="text-right font-mono text-muted-foreground py-1.5">
-                                                        {bal !== null ? formatAUD(bal) : "—"}
-                                                    </TableCell>
-                                                </TableRow>
-                                            )
-                                        })}
-                                    </TableBody>
-                                </Table>
+                            <div className="rounded-lg border overflow-hidden divide-y">
+                                {preview.new_transactions.map((txn) => {
+                                    const amt = Number(txn.amount)
+                                    const bal = txn.balance !== null ? Number(txn.balance) : null
+                                    return (
+                                        <div key={txn.dedup_hash} className="px-4 py-2.5">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <span className="text-sm min-w-0 flex-1 truncate" title={txn.description}>
+                                                    {txn.description}
+                                                </span>
+                                                <span
+                                                    className={cn(
+                                                        "font-mono text-sm font-medium whitespace-nowrap shrink-0",
+                                                        amt < 0
+                                                            ? "text-red-600 dark:text-red-400"
+                                                            : "text-green-600 dark:text-green-400"
+                                                    )}
+                                                >
+                                                    {amt < 0 ? "−" : "+"}
+                                                    {formatAUD(amt)}
+                                                </span>
+                                            </div>
+                                            <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                                <span className="font-mono">{formatDate(String(txn.date))}</span>
+                                                {bal !== null && (
+                                                    <span className="font-mono">bal: {formatAUD(bal)}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         </>
                     )}

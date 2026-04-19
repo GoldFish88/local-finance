@@ -9,7 +9,7 @@ import {
     TriangleAlert,
     Pencil,
 } from "lucide-react";
-import { ArrowUpDown } from "lucide-react";
+
 import {
     Bar,
     BarChart,
@@ -33,14 +33,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PrivacyValue } from "@/components/privacy-value"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -324,24 +317,6 @@ export default function AllTransactionsPage() {
     const loading = transactions === null && !error
     const doneUploads = uploads.filter((u) => u.status === "done")
 
-
-    const requestSort = (key: "date" | "description" | "amount" | "category") => {
-        let direction: "asc" | "desc" = "asc";
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
-            direction = "desc";
-        }
-        setSortConfig({ key, direction });
-    };
-
-    // Sortable Header helper
-    const sortHead = (label: string, key: "date" | "description" | "amount" | "category", right = false) => (
-        <TableHead className={right ? "text-right cursor-pointer select-none" : "cursor-pointer select-none"} onClick={() => requestSort(key)}>
-            <div className={`flex items-center gap-1 hover:text-foreground ${right ? "justify-end" : ""}`}>
-                {label}
-                <ArrowUpDown className="h-3 w-3 opacity-50" />
-            </div>
-        </TableHead>
-    );
 
     return (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
@@ -653,6 +628,25 @@ export default function AllTransactionsPage() {
                     <p className="text-sm text-muted-foreground">
                         {filtered.length} of {transactions?.length ?? 0}
                     </p>
+                    <select
+                        value={sortConfig ? `${sortConfig.key}-${sortConfig.direction}` : ""}
+                        onChange={(e) => {
+                            if (!e.target.value) { setSortConfig(null); return; }
+                            const parts = e.target.value.split("-");
+                            const dir = parts.pop() as "asc" | "desc";
+                            const key = parts.join("-") as "date" | "description" | "amount" | "category";
+                            setSortConfig({ key, direction: dir });
+                        }}
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                        <option value="">Sort: Default</option>
+                        <option value="date-desc">Date (newest)</option>
+                        <option value="date-asc">Date (oldest)</option>
+                        <option value="amount-asc">Amount (low→high)</option>
+                        <option value="amount-desc">Amount (high→low)</option>
+                        <option value="description-asc">Description (A–Z)</option>
+                        <option value="category-asc">Category (A–Z)</option>
+                    </select>
                     <div className="ml-auto flex items-center gap-2">
                         <Button
                             variant="outline"
@@ -676,130 +670,109 @@ export default function AllTransactionsPage() {
                 </div>
             </div>
 
-            {/* Transaction table */}
+            {/* Transaction list */}
             <Card>
                 <CardContent className="p-0">
                     {loading ? (
                         <div className="p-4 sm:p-6 space-y-3">
                             {[...Array(10)].map((_, i) => (
-                                <Skeleton key={i} className="h-10 w-full" />
+                                <Skeleton key={i} className="h-16 w-full" />
                             ))}
                         </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="text-center text-muted-foreground py-16 text-sm">
+                            {transactions?.length === 0
+                                ? "No completed statement uploads yet."
+                                : "No transactions match the current filter."}
+                        </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <Table className="min-w-[800px]">
-                                <TableHeader>
-                                    <TableRow>
-                                        {sortHead("Date", "date")}
-                                        {sortHead("Description", "description")}
-                                        {sortHead("Amount", "amount", true)}
-
-
-
-                                        {sortHead("Category", "category")}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filtered.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={7}
-                                                className="text-center text-muted-foreground py-16"
-                                            >
-                                                {transactions?.length === 0
-                                                    ? "No completed statement uploads yet."
-                                                    : "No transactions match the current filter."}
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        paginated.map((txn) => {
-                                            const amt = effectiveAmount(txn); const isNaNAmt = !isFinite(amt)
-                                            return (
-                                                <TableRow
-                                                    key={txn.id}
-                                                    className={cn(isNaNAmt && "bg-amber-50/60 dark:bg-amber-900/10")}
-                                                >
-                                                    <TableCell className="font-mono text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
-                                                        {formatTxnDate(txn.date)}
-                                                    </TableCell>
-                                                    <TableCell
-                                                        className="text-sm max-w-[140px] sm:max-w-[200px] truncate"
-                                                        title={txn.description}
+                        <div className="divide-y">
+                            {paginated.map((txn) => {
+                                const amt = effectiveAmount(txn)
+                                const isNaNAmt = !isFinite(amt)
+                                return (
+                                    <div
+                                        key={txn.id}
+                                        className={cn(
+                                            "px-4 py-3",
+                                            isNaNAmt && "bg-amber-50/60 dark:bg-amber-900/10"
+                                        )}
+                                    >
+                                        {/* Top row: description + amount */}
+                                        <div className="flex items-start justify-between gap-3">
+                                            <p className="text-sm min-w-0 flex-1 truncate" title={txn.description}>
+                                                {txn.description}
+                                            </p>
+                                            <div className="shrink-0 text-right">
+                                                {isNaNAmt ? (
+                                                    <Link
+                                                        href={`/uploads/${txn.source_upload_id}`}
+                                                        className="flex items-center gap-1 text-amber-600 hover:underline text-sm"
+                                                        title="Open statement to correct"
                                                     >
-                                                        {txn.description}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {isNaNAmt ? (
-                                                            <Link
-                                                                href={`/uploads/${txn.source_upload_id}`}
-                                                                className="flex items-center gap-1 ml-auto text-amber-600 hover:underline text-sm"
-                                                                title="Open statement to correct"
-                                                            >
-                                                                <TriangleAlert className="h-3.5 w-3.5" />
-                                                                <span className="hidden sm:inline">Invalid</span>
-                                                            </Link>
-                                                        ) : (
-                                                            <span
-                                                                className={cn(
-                                                                    "font-mono text-sm font-medium whitespace-nowrap",
-                                                                    amt < 0
-                                                                        ? "text-red-600 dark:text-red-400"
-                                                                        : "text-green-600 dark:text-green-400"
-                                                                )}
-                                                            >
-                                                                {amt < 0 ? "−" : "+"}
-                                                                {formatAUD(amt)}
-                                                            </span>
+                                                        <TriangleAlert className="h-3.5 w-3.5" />
+                                                        <span>Invalid</span>
+                                                    </Link>
+                                                ) : (
+                                                    <span
+                                                        className={cn(
+                                                            "font-mono text-sm font-medium whitespace-nowrap",
+                                                            amt < 0
+                                                                ? "text-red-600 dark:text-red-400"
+                                                                : "text-green-600 dark:text-green-400"
                                                         )}
-                                                    </TableCell>
-
-
-
-                                                    <TableCell className="relative">
-                                                        {categoryEditId === txn.id ? (
-                                                            <CategoryPicker
-                                                                categories={categories}
-                                                                currentCategoryId={txn.category_id}
-                                                                onAssign={(catId, learn) => handleAssignCategory(txn, catId, learn)}
-                                                                onClose={() => setCategoryEditId(null)}
-                                                            />
-                                                        ) : (
-                                                            <button
-                                                                className="group flex items-center gap-1.5 w-full text-left"
-                                                                onClick={() => setCategoryEditId(txn.id)}
-                                                                title="Click to assign category"
-                                                            >
-                                                                {txn.category_name ? (
-                                                                    <Badge
-                                                                        variant="secondary"
-                                                                        className="text-xs border-transparent"
-                                                                        style={(() => {
-                                                                            const color = txn.category_id ? categoryMap[txn.category_id]?.color : null
-                                                                            return color
-                                                                                ? { backgroundColor: hexToRgba(color, 0.15), color }
-                                                                                : undefined
-                                                                        })()}
-                                                                    >
-                                                                        {txn.category_name}
-                                                                    </Badge>
-                                                                ) : (
-                                                                    <span className={cn(
-                                                                        "text-xs font-medium",
-                                                                        txn.status === "pending_review" ? "text-amber-600" : "text-muted-foreground",
-                                                                    )}>
-                                                                        {txn.status === "pending_review" ? "Needs review" : "Pending"}
-                                                                    </span>
-                                                                )}
-                                                                <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-60 shrink-0" />
-                                                            </button>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            )
-                                        })
-                                    )}
-                                </TableBody>
-                            </Table>
+                                                    >
+                                                        <PrivacyValue>{amt < 0 ? "−" : "+"}{formatAUD(amt)}</PrivacyValue>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {/* Bottom row: date + category */}
+                                        <div className="mt-1.5 flex items-center gap-3 flex-wrap">
+                                            <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+                                                {formatTxnDate(txn.date)}
+                                            </span>
+                                            {categoryEditId === txn.id ? (
+                                                <CategoryPicker
+                                                    categories={categories}
+                                                    currentCategoryId={txn.category_id}
+                                                    onAssign={(catId, learn) => handleAssignCategory(txn, catId, learn)}
+                                                    onClose={() => setCategoryEditId(null)}
+                                                />
+                                            ) : (
+                                                <button
+                                                    className="group flex items-center gap-1.5 text-left"
+                                                    onClick={() => setCategoryEditId(txn.id)}
+                                                    title="Click to assign category"
+                                                >
+                                                    {txn.category_name ? (
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="text-xs border-transparent"
+                                                            style={(() => {
+                                                                const color = txn.category_id ? categoryMap[txn.category_id]?.color : null
+                                                                return color
+                                                                    ? { backgroundColor: hexToRgba(color, 0.15), color }
+                                                                    : undefined
+                                                            })()}
+                                                        >
+                                                            {txn.category_name}
+                                                        </Badge>
+                                                    ) : (
+                                                        <span className={cn(
+                                                            "text-xs font-medium",
+                                                            txn.status === "pending_review" ? "text-amber-600" : "text-muted-foreground",
+                                                        )}>
+                                                            {txn.status === "pending_review" ? "Needs review" : "Pending"}
+                                                        </span>
+                                                    )}
+                                                    <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-60 shrink-0" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
                     )}
                 </CardContent>
