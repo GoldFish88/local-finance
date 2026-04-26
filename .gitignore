@@ -22,6 +22,7 @@ postgres_data/
 *.swp
 
 *.env*
+!.env.example
 
 *.pdf
 *.zip

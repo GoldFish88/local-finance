@@ -15,10 +15,13 @@ services:
     ports:
       # Expose postgres so you can connect directly (e.g. psql, DB GUI, local backend)
       - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: localdev
 
   backend:
     ports:
       # Expose backend directly for curl / API testing without going through nginx
       - "8000:8000"
     environment:
+      DATABASE_URL: "postgresql+asyncpg://finance:localdev@postgres:5432/finance"
       CORS_ORIGINS: "http://localhost:8080"

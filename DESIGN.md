@@ -1,14 +1,72 @@
-# Implementation Notes
+# Design & Implementation Notes
 
-This document is the implementation-focused companion to [README.md](README.md). It emphasizes the parts of the project that demonstrate applied data and ML-adjacent engineering: document extraction, normalization, provenance, categorisation, reporting semantics, and storage design.
+This document covers the concepts, architecture, and implementation details behind Local Finance. For setup and deployment instructions see [README.md](README.md).
 
-## What this project demonstrates
+---
 
-- Converting semi-structured financial PDFs into a canonical transaction dataset.
-- Building a human-in-the-loop labeling loop instead of treating classification as a one-shot model problem.
-- Preserving provenance so extracted rows can be audited against the original source document.
-- Modeling reporting semantics separately from raw ledger semantics.
-- Using a simple, explainable local classifier that can improve incrementally from user feedback.
+## Core concepts
+
+| Concept | What it represents | Why it matters |
+|---|---|---|
+| Statement upload | One source PDF plus its ingestion status, storage path, and statement period | This is the unit of ingestion, re-upload, and archival |
+| Transaction | The canonical record created from the statement: date, description, signed amount, optional balance, optional category | This is the main analytical unit across the entire app |
+| Category | A user-defined label with a color and a reporting rule | Categories drive both classification and downstream reporting |
+| Learned example | A raw transaction description stored in `manual_overrides`, either from seed phrases or verified user edits | This is the app's current classification memory |
+| Reporting rule | How a category should behave in analytics: `default`, `expense`, `income`, or `transfer` | This separates bank movement semantics from reporting semantics |
+| Override amount | An optional per-transaction "My Share" value that replaces the bank amount in reporting views | This lets the app model shared spending without mutating the raw transaction |
+| Source provenance | An optional PDF bounding box linked to a transaction row | This keeps review and correction auditable against the source document |
+
+## Capability map
+
+| Area | What works today | Natural extension points |
+|---|---|---|
+| Ingestion | Upload PDFs, process them in the background, keep the original file, and archive uploads | More bank adapters, email ingestion, automated statement detection |
+| Extraction | Parse ANZ tables into normalized signed transactions with dates, descriptions, balances, and page coordinates | OCR fallback, quality scoring, extraction benchmarks |
+| Review | Render statement pages, inspect transactions side-by-side with the PDF, and add/edit/delete rows manually | Better audit trails, bulk correction tools, reviewer workflows |
+| Classification | Seed categories with example phrases, auto-classify with exact and trigram similarity, and learn from manual assignments | Merchant normalization, embeddings, active learning, confidence evaluation |
+| Reporting | Browse transactions across statements, filter/search/sort, see statement summaries and charts, and export CSV/XLSX | Budgets, cash-flow forecasting, recurring spend detection, anomaly detection |
+| Privacy | Hide monetary values in the UI with privacy mode | Fine-grained redaction, export masking, screenshot-safe views |
+
+## User workflow
+
+1. Upload a statement PDF.
+2. The app saves the PDF, extracts rows in the background, and normalises them into a canonical transaction shape.
+3. Transactions are auto-classified against the current category and example set.
+4. Review the statement against the original PDF, fix extraction mistakes, and teach the system through manual categorisation.
+5. Analyse the resulting dataset across statements, categories, and time ranges.
+
+## API surface
+
+Key endpoints exposed by the backend (interactive docs at `http://localhost:8000/docs`):
+
+| Path | Purpose |
+|---|---|
+| `GET /health` | Basic API and database health check |
+| `POST /extract` | Stateless extraction for debugging or evaluation without DB writes |
+| `GET /uploads`, `POST /uploads`, `GET /uploads/{id}`, `DELETE /uploads/{id}` | List, create, inspect, and archive statement uploads |
+| `GET /uploads/{id}/pdf`, `GET /uploads/{id}/pages`, `GET /uploads/{id}/pages/{n}` | Access the original PDF and rendered pages for review |
+| `GET /uploads/{id}/transactions`, `POST /uploads/{id}/transactions` | Read and manually add transactions |
+| `PATCH /uploads/{id}/transactions/{txn_id}`, `DELETE /uploads/{id}/transactions/{txn_id}` | Edit or delete extracted transactions |
+| `PATCH /uploads/{id}/transactions/{txn_id}/override` | Set or clear the per-transaction override amount |
+| `PATCH /uploads/{id}/transactions/{txn_id}/category` | Assign or clear a category, optionally teaching the classifier |
+| `POST /uploads/{id}/classify` | Re-run classification on pending rows for an upload |
+| `POST /uploads/{id}/reupload/preview`, `POST /uploads/{id}/reupload/confirm` | Diff a new PDF against an existing statement and append only new rows |
+| `GET /categories`, `POST /categories`, `PATCH /categories/{id}`, `DELETE /categories/{id}` | Manage the category taxonomy |
+| `GET /categories/{id}/examples` | Inspect the learned example phrases for a category |
+
+## Current constraints
+
+- The extractor is tuned for ANZ statement formats.
+- The app is local-first and single-user; there is no authentication or multi-tenant model.
+- Pages that Docling cannot extract are surfaced for manual review rather than sent through a secondary OCR/LLM fallback.
+- Classification is based on curated example strings and trigram similarity, not embeddings.
+- There is no formal test suite or migration runner yet.
+
+---
+
+## Implementation notes
+
+This section emphasizes the parts of the project that demonstrate applied data and ML-adjacent engineering: document extraction, normalization, provenance, categorisation, reporting semantics, and storage design.
 
 ## End-to-end pipeline
 

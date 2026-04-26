@@ -1,76 +1,108 @@
 # Local Finance
 
-Local Finance is a local-first statement ingestion and review app for Australian bank statements. It turns statement PDFs into structured transactions, keeps the source document alongside the extracted data, and gives you a human-in-the-loop workflow for categorisation and reporting.
+A self-hosted app for turning bank statement PDFs into structured, searchable transactions. Upload a statement, review the extracted rows side-by-side with the original PDF, assign categories, and analyse spending across statements and time.
 
-The current implementation is tuned for ANZ PDFs and a single-user local workflow. The goal is not just extraction, but a durable data model that can support richer features later.
+Currently tuned for ANZ statement formats. Single-user, no authentication required.
 
-## Core concepts
+For architecture and design details see [DESIGN.md](DESIGN.md).
 
-| Concept | What it represents | Why it matters |
-|---|---|---|
-| Statement upload | One source PDF plus its ingestion status, storage path, and statement period | This is the unit of ingestion, re-upload, and archival |
-| Transaction | The canonical record created from the statement: date, description, signed amount, optional balance, optional category | This is the main analytical unit across the entire app |
-| Category | A user-defined label with a color and a reporting rule | Categories drive both classification and downstream reporting |
-| Learned example | A raw transaction description stored in `manual_overrides`, either from seed phrases or verified user edits | This is the app's current classification memory |
-| Reporting rule | How a category should behave in analytics: `default`, `expense`, `income`, or `transfer` | This separates bank movement semantics from reporting semantics |
-| Override amount | An optional per-transaction "My Share" value that replaces the bank amount in reporting views | This lets the app model shared spending without mutating the raw transaction |
-| Source provenance | An optional PDF bounding box linked to a transaction row | This keeps review and correction auditable against the source document |
+---
 
-## Capability map
-
-| Area | What works today | Natural extension points |
-|---|---|---|
-| Ingestion | Upload PDFs, process them in the background, keep the original file, and archive uploads | More bank adapters, email ingestion, automated statement detection |
-| Extraction | Parse ANZ tables into normalized signed transactions with dates, descriptions, balances, and page coordinates | OCR fallback, quality scoring, extraction benchmarks |
-| Review | Render statement pages, inspect transactions side-by-side with the PDF, and add/edit/delete rows manually | Better audit trails, bulk correction tools, reviewer workflows |
-| Classification | Seed categories with example phrases, auto-classify with exact and trigram similarity, and learn from manual assignments | Merchant normalization, embeddings, active learning, confidence evaluation |
-| Reporting | Browse transactions across statements, filter/search/sort, see statement summaries and charts, and export CSV/XLSX | Budgets, cash-flow forecasting, recurring spend detection, anomaly detection |
-| Privacy | Hide monetary values in the UI with privacy mode | Fine-grained redaction, export masking, screenshot-safe views |
-
-## Current workflow
-
-1. Upload a statement PDF.
-2. Save the PDF, extract rows in the background, and normalize them into a canonical transaction shape.
-3. Auto-classify what can be classified from the current category/example set.
-4. Review the statement against the original PDF, fix extraction mistakes, and teach the system through manual categorisation.
-5. Analyse the resulting dataset across statements, categories, and time ranges.
-
-## Technical focus
-
-This repo already contains the foundations for a meaningful applied data product: semi-structured document extraction, normalization, provenance capture, human-in-the-loop labeling, and analytics-aware data modeling. The implementation details live in [DESIGN.md](DESIGN.md).
-
-## Quick start
-
-### Docker (development)
+## Run locally (no configuration needed)
 
 ```bash
-cp .env.example .env
+git clone <repo>
+cd local-finance
 docker compose up --build
 ```
 
-- App via nginx: http://localhost:8080
-- Backend API and Swagger docs: http://localhost:8000/docs
-- Postgres: `localhost:5432`
+Open **http://localhost:8080**.
 
-The development stack automatically applies [docker-compose.override.yml](docker-compose.override.yml), which exposes nginx on port `8080` and the backend on `8000` for direct API access. The first upload can be slow because Docling may download its models on demand.
+That's it. The development override (`docker-compose.override.yml`) is applied automatically and supplies all defaults — no `.env` file is required.
 
-For a production-style compose run without the dev override:
+> The first PDF upload can be slow because [Docling](https://github.com/DS4SD/docling) downloads its table-extraction models on demand (~1 GB). Subsequent uploads are fast.
+
+Other ports exposed locally:
+
+| Service | URL |
+|---|---|
+| App (nginx) | http://localhost:8080 |
+| Backend API + Swagger | http://localhost:8000/docs |
+| Postgres | `localhost:5432` |
+
+---
+
+## Deploy on your own server
+
+### Prerequisites
+
+- A Linux server with Docker and Docker Compose installed
+- A domain name pointed at the server's IP
+- SSL certificates for that domain (e.g. via [Certbot](https://certbot.eff.org/))
+
+### 1. Clone and configure
 
 ```bash
-docker compose -f docker-compose.yml up --build
+git clone <repo>
+cd local-finance
+cp .env.example .env
 ```
 
-### Local development
+Edit `.env` and set at minimum:
 
-Running the backend and frontend locally gives faster edit/reload cycles.
+```dotenv
+DOMAIN=finance.yourdomain.com
+POSTGRES_PASSWORD=<strong-random-password>
+DATABASE_URL=postgresql+asyncpg://finance:<strong-random-password>@postgres:5432/finance
+```
 
-#### Postgres
+Generate a strong password with:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+```
+
+### 2. Obtain SSL certificates
+
+```bash
+sudo certbot certonly --standalone -d finance.yourdomain.com
+```
+
+Certbot stores certificates under `/etc/letsencrypt/live/<domain>/` by default, which is where the nginx config expects them. If you store them elsewhere, set `LETSENCRYPT_DIR` in `.env`.
+
+### 3. Start the stack
+
+```bash
+docker compose -f docker-compose.yml up --build -d
+```
+
+The `-f docker-compose.yml` flag skips the local development override so the production nginx config (HTTPS, port 443) is used instead.
+
+The app will be available at `https://finance.yourdomain.com`.
+
+### Certificate renewal
+
+Certbot auto-renews certificates. After renewal, reload nginx to pick up the new cert:
+
+```bash
+docker compose exec nginx nginx -s reload
+```
+
+You can automate this with a post-renewal hook in `/etc/letsencrypt/renewal-hooks/deploy/`.
+
+---
+
+## Develop locally (without Docker)
+
+Faster edit/reload cycles for backend or frontend work.
+
+### Postgres (via Docker)
 
 ```bash
 docker compose up postgres
 ```
 
-#### Backend
+### Backend
 
 ```bash
 cd backend
@@ -78,7 +110,7 @@ uv sync
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-#### Frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -86,48 +118,22 @@ npm install
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```
 
-The local frontend runs on http://localhost:3000.
+Frontend runs on http://localhost:3000.
 
-## Configuration
+---
 
-Copy `.env.example` to `.env` and adjust as needed.
+## Configuration reference
 
-| Variable | Default | Description |
+Production deployments use a `.env` file. Local dev works without one (defaults are wired in `docker-compose.override.yml`).
+
+| Variable | Local default | Description |
 |---|---|---|
-| `POSTGRES_PASSWORD` | `CHANGE_ME_GENERATE_A_STRONG_PASSWORD` | Password used by the Docker Postgres service |
-| `DATABASE_URL` | `postgresql+asyncpg://finance:...@postgres:5432/finance` | Backend database connection string |
-| `PDF_STORAGE_PATH` | `/data/pdfs` | Filesystem location for uploaded PDFs |
-| `CLASSIFICATION_MIN_SIMILARITY` | `0.30` | Minimum trigram similarity required for automatic classification |
-| `CLASSIFICATION_K` | `3` | Number of nearest example strings used in similarity voting |
-| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:8080` | Allowed origins for local backend development |
+| `DOMAIN` | *(not used locally)* | Your public domain name — used by nginx and CORS |
+| `POSTGRES_PASSWORD` | `localdev` | Postgres password |
+| `DATABASE_URL` | `postgresql+asyncpg://finance:localdev@postgres:5432/finance` | Backend DB connection string |
+| `PDF_STORAGE_PATH` | `/data/pdfs` | Where uploaded PDFs are stored inside the container |
+| `LETSENCRYPT_DIR` | `/etc/letsencrypt` | Host path to Let's Encrypt certificate directory |
+| `CLASSIFICATION_MIN_SIMILARITY` | `0.30` | Minimum trigram similarity for auto-classification |
+| `CLASSIFICATION_K` | `3` | Number of nearest examples used in similarity voting |
 
-When you run the frontend outside Docker, set `NEXT_PUBLIC_API_URL` to the backend URL you want the browser to call.
-
-## API surface
-
-Key endpoints exposed by the current backend:
-
-| Path | Purpose |
-|---|---|
-| `GET /health` | Basic API and database health check |
-| `POST /extract` | Stateless extraction for debugging or evaluation without DB writes |
-| `GET /uploads`, `POST /uploads`, `GET /uploads/{id}`, `DELETE /uploads/{id}` | List, create, inspect, and archive statement uploads |
-| `GET /uploads/{id}/pdf`, `GET /uploads/{id}/pages`, `GET /uploads/{id}/pages/{n}` | Access the original PDF and rendered pages for review |
-| `GET /uploads/{id}/transactions`, `POST /uploads/{id}/transactions` | Read and manually add transactions |
-| `PATCH /uploads/{id}/transactions/{txn_id}`, `DELETE /uploads/{id}/transactions/{txn_id}` | Edit or delete extracted transactions |
-| `PATCH /uploads/{id}/transactions/{txn_id}/override` | Set or clear the per-transaction override amount |
-| `PATCH /uploads/{id}/transactions/{txn_id}/category` | Assign or clear a category, optionally teaching the classifier |
-| `POST /uploads/{id}/classify` | Re-run classification on pending rows for an upload |
-| `POST /uploads/{id}/reupload/preview`, `POST /uploads/{id}/reupload/confirm` | Diff a new PDF against an existing statement and append only new rows |
-| `GET /categories`, `POST /categories`, `PATCH /categories/{id}`, `DELETE /categories/{id}` | Manage the category taxonomy |
-| `GET /categories/{id}/examples` | Inspect the learned example phrases for a category |
-
-Interactive docs are available at http://localhost:8000/docs when the backend is running.
-
-## Current constraints
-
-- The extractor is currently tuned for ANZ statement formats.
-- The app is local-first and single-user; there is no authentication or multi-tenant model.
-- Pages that Docling cannot extract are surfaced for manual review rather than sent through a secondary OCR/LLM fallback.
-- Classification is currently based on curated example strings and trigram similarity, not embeddings.
-- There is no formal test suite or migration runner yet.
+When running the frontend outside Docker, set `NEXT_PUBLIC_API_URL` to the backend URL (e.g. `http://localhost:8000`). This value is baked into the Next.js bundle at build time.

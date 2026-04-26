@@ -1,3 +1,9 @@
+# This file is processed by the nginx Docker image's envsubst entrypoint.
+# All ${VARIABLE} references are replaced with environment variable values at
+# container startup. Set DOMAIN in your .env file (e.g. DOMAIN=finance.example.com).
+#
+# NOTE: nginx variables like $host, $scheme, $remote_addr are NOT substituted
+# because they are not defined as container environment variables.
 events {
     worker_connections 1024;
 }
@@ -7,17 +13,17 @@ http {
     server_tokens off;
 
     server {
-	listen 80;
-	server_name finance.guinto.org;
-	return 301 https://$host$request_uri;
+        listen 80;
+        server_name ${DOMAIN};
+        return 301 https://$host$request_uri;
     }
 
     server {
         listen 443 ssl;
-        server_name finance.guinto.org;
+        server_name ${DOMAIN};
 
-        ssl_certificate /etc/letsencrypt/live/finance.guinto.org/fullchain.pem;
-        ssl_certificate_key /etc/letsencrypt/live/finance.guinto.org/privkey.pem;
+        ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers on;
