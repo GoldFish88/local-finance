@@ -443,58 +443,65 @@ export default function AllTransactionsPage() {
                                     {categoryExpenseData.length === 0 ? (
                                         <p className="text-sm text-muted-foreground py-4">No categories with positive net expense yet</p>
                                     ) : (
-                                        <div className="flex items-center gap-4">
-                                            <div className="shrink-0" style={{ width: 140, height: 140 }}>
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <PieChart>
-                                                        <Pie
-                                                            data={categoryExpenseData}
-                                                            dataKey="value"
-                                                            nameKey="name"
-                                                            cx="50%"
-                                                            cy="50%"
-                                                            innerRadius="52%"
-                                                            outerRadius="88%"
-                                                            paddingAngle={2}
-                                                            strokeWidth={0}
-                                                        >
-                                                            {categoryExpenseData.map((entry, i) => (
-                                                                <Cell key={i} fill={entry.color} />
-                                                            ))}
-                                                        </Pie>
-                                                        <Tooltip
-                                                            content={({ active, payload }) => {
-                                                                if (!active || !payload?.length) return null
-                                                                const { name, value } = payload[0]
-                                                                const pct =
-                                                                    totalCategoryExpenses > 0
-                                                                        ? (((value as number) / totalCategoryExpenses) * 100).toFixed(1)
-                                                                        : "0.0"
-                                                                return (
-                                                                    <div className="bg-popover border border-border rounded-md text-xs px-2.5 py-1.5 leading-relaxed text-popover-foreground shadow-md">
-                                                                        <p className="font-semibold mb-0.5">{name as string}</p>
-                                                                        <p>{new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(value as number)}</p>
-                                                                        <p className="text-muted-foreground">{pct}%</p>
-                                                                    </div>
-                                                                )
-                                                            }}
-                                                        />
-                                                    </PieChart>
-                                                </ResponsiveContainer>
+                                        <>
+                                            <div className="flex items-center gap-4">
+                                                <div className="shrink-0" style={{ width: 140, height: 140 }}>
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <PieChart>
+                                                            <Pie
+                                                                data={categoryExpenseData}
+                                                                dataKey="value"
+                                                                nameKey="name"
+                                                                cx="50%"
+                                                                cy="50%"
+                                                                innerRadius="52%"
+                                                                outerRadius="88%"
+                                                                paddingAngle={2}
+                                                                strokeWidth={0}
+                                                            >
+                                                                {categoryExpenseData.map((entry, i) => (
+                                                                    <Cell key={i} fill={entry.color} />
+                                                                ))}
+                                                            </Pie>
+                                                            <Tooltip
+                                                                content={({ active, payload }) => {
+                                                                    if (!active || !payload?.length) return null
+                                                                    const { name, value } = payload[0]
+                                                                    const pct =
+                                                                        totalCategoryExpenses > 0
+                                                                            ? (((value as number) / totalCategoryExpenses) * 100).toFixed(1)
+                                                                            : "0.0"
+                                                                    return (
+                                                                        <div className="bg-popover border border-border rounded-md text-xs px-2.5 py-1.5 leading-relaxed text-popover-foreground shadow-md">
+                                                                            <p className="font-semibold mb-0.5">{name as string}</p>
+                                                                            <p>{new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(value as number)}</p>
+                                                                            <p className="text-muted-foreground">{pct}%</p>
+                                                                        </div>
+                                                                    )
+                                                                }}
+                                                            />
+                                                        </PieChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                                <ul className="min-w-0 flex-1 space-y-1.5">
+                                                    {categoryExpenseData.slice(0, 6).map((d) => (
+                                                        <li key={d.name} className="flex items-center gap-2 text-xs min-w-0">
+                                                            <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: d.color }} />
+                                                            <span className="truncate text-foreground flex-1" title={d.name}>{d.name}</span>
+                                                            <PrivacyValue className="font-mono text-muted-foreground shrink-0">{formatAUD(d.value)}</PrivacyValue>
+                                                        </li>
+                                                    ))}
+                                                    {categoryExpenseData.length > 6 && (
+                                                        <li className="text-xs text-muted-foreground pl-4">+{categoryExpenseData.length - 6} more</li>
+                                                    )}
+                                                </ul>
                                             </div>
-                                            <ul className="min-w-0 flex-1 space-y-1.5">
-                                                {categoryExpenseData.slice(0, 6).map((d) => (
-                                                    <li key={d.name} className="flex items-center gap-2 text-xs min-w-0">
-                                                        <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: d.color }} />
-                                                        <span className="truncate text-foreground flex-1" title={d.name}>{d.name}</span>
-                                                        <PrivacyValue className="font-mono text-muted-foreground shrink-0">{formatAUD(d.value)}</PrivacyValue>
-                                                    </li>
-                                                ))}
-                                                {categoryExpenseData.length > 6 && (
-                                                    <li className="text-xs text-muted-foreground pl-4">+{categoryExpenseData.length - 6} more</li>
-                                                )}
-                                            </ul>
-                                        </div>
+                                            <div className="mt-3 pt-3 border-t border-border/50">
+                                                <Link href="/categories" className="text-xs text-primary hover:underline flex items-center gap-1">
+                                                    More insights →
+                                                </Link>
+                                            </div>
+                                        </>
                                     )}
                                 </CardContent>
                             </Card>

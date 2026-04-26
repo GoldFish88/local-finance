@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { AlertCircle, ChevronDown, ChevronUp, Loader2, Plus, Save, Tag, Trash2, X } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { AlertCircle, ChevronDown, ChevronUp, Loader2, Plus, Save, Tag, Trash2, X, TrendingUp } from "lucide-react"
 import { api } from "@/lib/api"
 import { REPORTING_RULE_OPTIONS } from "@/lib/reporting"
 import type { Category, ReportingRule } from "@/lib/types"
@@ -10,6 +10,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Legend,
+} from "recharts"
+import { PrivacyValue } from "@/components/privacy-value"
 
 // ─── Color swatches ──────────────────────────────────────────────────────────
 
@@ -469,12 +480,36 @@ function CategoryRow({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+interface SpendingDataPoint {
+    category_id: string
+    category_name: string
+    color: string | null
+    reporting_rule: string
+    month: string
+    amount: number
+}
+
+function formatAUD(amount: number) {
+    if (!isFinite(amount)) return "—"
+    return new Intl.NumberFormat("en-AU", {
+        style: "currency",
+        currency: "AUD",
+    }).format(Math.abs(amount))
+}
+
 export default function CategoriesPage() {
     const [categories, setCategories] = useState<Category[] | null>(null)
+    const [spendingData, setSpendingData] = useState<SpendingDataPoint[] | null>(null)
+    const [selectedCategory, setSelectedCategory] = useState<string>("total-expenses")
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
-        api.getCategories().then(setCategories).catch((e) => setError(e.message))
+        Promise.all([api.getCategories(), api.getCategoriesSpending()])
+            .then(([cats, spending]) => {
+                setCategories(cats)
+                setSpendingData(spending)
+            })
+            .catch((e) => setError(e.message))
     }, [])
 
     function handleCreate(cat: Category) {
@@ -491,8 +526,226 @@ export default function CategoriesPage() {
         )
     }
 
+    // Process spending data into chart format and calculate stats
+    const { chartData, categoryStats } = useMemo(() => {
+        if (!spendingData || !categories) {
+            return { chartData: [], categoryStats: new Map() }
+        }
+
+        // Find and exclude the latest month (incomplete data)
+        const sortedMonths = Array.from(new Set(spendingData.map((p) => p.month))).sort()
+        const latestMonth = sortedMonths[sortedMonths.length - 1]
+        const filteredSpendingData = spendingData.filter((p) => p.month !== latestMonth)
+
+        // Build a map of category_id -> Category for rule lookup
+        const categoryMap = Object.fromEntries(categories.map((c) => [c.id, c]))
+
+        // Calculate expense impact based on reporting rule
+        const expenseByMonthCategory = new Map<string, Map<string, number>>()
+        const categoryTotals = new Map<string, { total: number; monthCount: number; name: string; color: string }>()
+
+        for (const point of filteredSpendingData) {
+            const cat = categoryMap[point.category_id]
+            if (!cat) continue
+
+            // Calculate expense impact based on reporting rule
+            let expense = 0
+            const amount = point.amount
+
+            switch (point.reporting_rule) {
+                case "transfer":
+                    expense = 0
+                    break
+                case "expense":
+                    expense = -amount
+                    break
+                case "income":
+                    expense = 0
+                    break
+                case "default":
+                    expense = amount < 0 ? Math.abs(amount) : 0
+                    break
+            }
+
+            if (expense === 0) continue
+
+            // Add to monthly data
+            if (!expenseByMonthCategory.has(point.month)) {
+                expenseByMonthCategory.set(point.month, new Map())
+            }
+            expenseByMonthCategory.get(point.month)!.set(point.category_id, expense)
+
+            // Add to totals
+            if (!categoryTotals.has(point.category_id)) {
+                categoryTotals.set(point.category_id, {
+                    total: 0,
+                    monthCount: 0,
+                    name: point.category_name,
+                    color: point.color ?? "#94a3b8",
+                })
+            }
+            const stats = categoryTotals.get(point.category_id)!
+            stats.total += expense
+            stats.monthCount += 1
+        }
+
+        // Filter data based on selected category
+        const months = Array.from(expenseByMonthCategory.keys()).sort()
+        let chart: Array<Record<string, unknown>>
+        const filteredStats = new Map<string, { total: number; monthCount: number; name: string; color: string }>()
+
+        if (selectedCategory === "total-expenses") {
+            // Aggregate all expense categories
+            chart = months.map((month) => {
+                const dataPoint: Record<string, unknown> = {
+                    month,
+                    label: new Date(month + "-02").toLocaleDateString("en-AU", {
+                        month: "short",
+                        year: "2-digit",
+                    }),
+                }
+                const monthData = expenseByMonthCategory.get(month)!
+                let totalExpense = 0
+                monthData.forEach((expense) => {
+                    totalExpense += expense
+                })
+                dataPoint["Total Expenses"] = Math.round(totalExpense * 100) / 100
+                return dataPoint
+            })
+
+            // Calculate aggregate stats
+            let total = 0
+            const monthCounts = new Set<string>()
+            categoryTotals.forEach((stats, catId) => {
+                total += stats.total
+                // Count unique months where this category had expenses
+                for (const point of filteredSpendingData) {
+                    if (point.category_id === catId) {
+                        monthCounts.add(point.month)
+                    }
+                }
+            })
+
+            filteredStats.set("total-expenses", {
+                total,
+                monthCount: monthCounts.size || 1,
+                name: "Total Expenses",
+                color: "#3b82f6",
+            })
+        } else {
+            // Show single category
+            chart = months.map((month) => {
+                const dataPoint: Record<string, unknown> = {
+                    month,
+                    label: new Date(month + "-02").toLocaleDateString("en-AU", {
+                        month: "short",
+                        year: "2-digit",
+                    }),
+                }
+                const monthData = expenseByMonthCategory.get(month)!
+                const expense = monthData.get(selectedCategory) || 0
+                const cat = categoryMap[selectedCategory]
+                if (cat) {
+                    dataPoint[cat.name] = Math.round(expense * 100) / 100
+                }
+                return dataPoint
+            })
+
+            // Include only the selected category stats
+            const stats = categoryTotals.get(selectedCategory)
+            if (stats) {
+                filteredStats.set(selectedCategory, stats)
+            }
+        }
+
+        return { chartData: chart, categoryStats: filteredStats }
+    }, [spendingData, categories, selectedCategory])
+
+    // Calculate top categories for insights
+    const topCategoryInsights = useMemo(() => {
+        if (!spendingData || !categories) {
+            return { topAllTime: [], topLast3Months: [] }
+        }
+
+        // Find and exclude the latest month (incomplete data)
+        const sortedMonths = Array.from(new Set(spendingData.map((p) => p.month))).sort()
+        const latestMonth = sortedMonths[sortedMonths.length - 1]
+        const filteredSpendingData = spendingData.filter((p) => p.month !== latestMonth)
+
+        const categoryMap = Object.fromEntries(categories.map((c) => [c.id, c]))
+        const allTimeTotals = new Map<string, { total: number; name: string; color: string }>()
+        const last3MonthsTotals = new Map<string, { total: number; name: string; color: string }>()
+
+        // Calculate threshold for last 3 months (using the month before the excluded latest month)
+        const secondLatestMonth = sortedMonths[sortedMonths.length - 2] || latestMonth
+        const last3MonthsThreshold = new Date(secondLatestMonth + "-01")
+        last3MonthsThreshold.setMonth(last3MonthsThreshold.getMonth() - 2)
+        const thresholdStr = last3MonthsThreshold.toISOString().slice(0, 7)
+
+        for (const point of filteredSpendingData) {
+            const cat = categoryMap[point.category_id]
+            if (!cat) continue
+
+            let expense = 0
+            const amount = point.amount
+
+            switch (point.reporting_rule) {
+                case "transfer":
+                    expense = 0
+                    break
+                case "expense":
+                    expense = -amount
+                    break
+                case "income":
+                    expense = 0
+                    break
+                case "default":
+                    expense = amount < 0 ? Math.abs(amount) : 0
+                    break
+            }
+
+            if (expense === 0) continue
+
+            // All time totals
+            if (!allTimeTotals.has(point.category_id)) {
+                allTimeTotals.set(point.category_id, {
+                    total: 0,
+                    name: point.category_name,
+                    color: point.color ?? "#94a3b8",
+                })
+            }
+            allTimeTotals.get(point.category_id)!.total += expense
+
+            // Last 3 months totals
+            if (point.month >= thresholdStr) {
+                if (!last3MonthsTotals.has(point.category_id)) {
+                    last3MonthsTotals.set(point.category_id, {
+                        total: 0,
+                        name: point.category_name,
+                        color: point.color ?? "#94a3b8",
+                    })
+                }
+                last3MonthsTotals.get(point.category_id)!.total += expense
+            }
+        }
+
+        const topAllTime = Array.from(allTimeTotals.entries())
+            .sort((a, b) => b[1].total - a[1].total)
+            .slice(0, 3)
+            .map(([id, stats]) => ({ id, ...stats }))
+
+        const topLast3Months = Array.from(last3MonthsTotals.entries())
+            .sort((a, b) => b[1].total - a[1].total)
+            .slice(0, 3)
+            .map(([id, stats]) => ({ id, ...stats }))
+
+        return { topAllTime, topLast3Months }
+    }, [spendingData, categories])
+
+    const hasSpendingData = chartData.length > 0
+
     return (
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Tag className="h-5 w-5" />
@@ -506,6 +759,215 @@ export default function CategoriesPage() {
             {error && (
                 <div className="flex items-center gap-2 text-sm text-destructive">
                     <AlertCircle className="h-4 w-4" /> {error}
+                </div>
+            )}
+
+            {/* Spending Insights Section */}
+            {hasSpendingData && categories && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        <h2 className="text-lg font-semibold">Spending Insights</h2>
+                    </div>
+
+                    {/* Category Selector */}
+                    <div className="flex items-center gap-3">
+                        <label htmlFor="category-select" className="text-sm font-medium text-muted-foreground">
+                            Category:
+                        </label>
+                        <select
+                            id="category-select"
+                            value={selectedCategory}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                            className="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <option value="total-expenses">Total Expenses</option>
+                            {categories
+                                .filter((cat) => {
+                                    // Find and exclude the latest month
+                                    const sortedMonths = Array.from(new Set((spendingData || []).map((p) => p.month))).sort()
+                                    const latestMonth = sortedMonths[sortedMonths.length - 1]
+
+                                    // Only show categories that have expense data (excluding latest month)
+                                    for (const point of spendingData || []) {
+                                        if (point.category_id === cat.id && point.month !== latestMonth) {
+                                            return true
+                                        }
+                                    }
+                                    return false
+                                })
+                                .sort((a, b) => a.name.localeCompare(b.name))
+                                .map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.name}
+                                    </option>
+                                ))}
+                        </select>
+                    </div>
+
+                    {/* Insight Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Combined Top Categories Card - spans 2 columns */}
+                        <Card className="md:col-span-2">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                                    Top Categories
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    {/* All Time Column */}
+                                    <div className="space-y-2">
+                                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                                            All Time
+                                        </h4>
+                                        {topCategoryInsights.topAllTime.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground">No expense data available</p>
+                                        ) : (
+                                            topCategoryInsights.topAllTime.map((cat, idx) => (
+                                                <div key={cat.id} className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <span className="text-xs font-medium text-muted-foreground w-4">
+                                                            {idx + 1}.
+                                                        </span>
+                                                        <div
+                                                            className="h-2.5 w-2.5 rounded-full shrink-0"
+                                                            style={{ backgroundColor: cat.color }}
+                                                        />
+                                                        <span className="text-sm truncate">{cat.name}</span>
+                                                    </div>
+                                                    <span className="text-sm font-medium shrink-0 ml-2">
+                                                        <PrivacyValue>{formatAUD(cat.total)}</PrivacyValue>
+                                                    </span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {/* Last 3 Months Column */}
+                                    <div className="space-y-2">
+                                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                                            Last 3 Months
+                                        </h4>
+                                        {topCategoryInsights.topLast3Months.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground">No recent data available</p>
+                                        ) : (
+                                            topCategoryInsights.topLast3Months.map((cat, idx) => (
+                                                <div key={cat.id} className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <span className="text-xs font-medium text-muted-foreground w-4">
+                                                            {idx + 1}.
+                                                        </span>
+                                                        <div
+                                                            className="h-2.5 w-2.5 rounded-full shrink-0"
+                                                            style={{ backgroundColor: cat.color }}
+                                                        />
+                                                        <span className="text-sm truncate">{cat.name}</span>
+                                                    </div>
+                                                    <span className="text-sm font-medium shrink-0 ml-2">
+                                                        <PrivacyValue>{formatAUD(cat.total)}</PrivacyValue>
+                                                    </span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Summary Stats Card - spans 1 column */}
+                        {Array.from(categoryStats.entries())
+                            .sort((a, b) => b[1].total - a[1].total)
+                            .map(([catId, stats]) => (
+                                <Card key={catId}>
+                                    <CardHeader className="pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div
+                                                className="h-3 w-3 rounded-full shrink-0"
+                                                style={{ backgroundColor: stats.color }}
+                                            />
+                                            <CardTitle className="text-sm font-medium">
+                                                {stats.name}
+                                            </CardTitle>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-1">
+                                        <div className="text-2xl font-bold">
+                                            <PrivacyValue>{formatAUD(stats.total)}</PrivacyValue>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            <PrivacyValue>
+                                                {formatAUD(stats.total / stats.monthCount)}/mo avg
+                                            </PrivacyValue>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                    </div>
+
+                    {/* Time Series Chart */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Spending Trends</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                    <XAxis
+                                        dataKey="label"
+                                        tick={{ fontSize: 12 }}
+                                        className="text-muted-foreground"
+                                    />
+                                    <YAxis
+                                        tick={{ fontSize: 12 }}
+                                        className="text-muted-foreground"
+                                        tickFormatter={(val) => `$${Math.round(val)}`}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: "hsl(var(--card))",
+                                            border: "1px solid hsl(var(--border))",
+                                            borderRadius: "6px",
+                                        }}
+                                        formatter={(value: unknown) => {
+                                            const num = typeof value === "number" ? value : 0
+                                            return [formatAUD(num), ""]
+                                        }}
+                                    />
+                                    <Legend
+                                        wrapperStyle={{ fontSize: "12px" }}
+                                        iconType="line"
+                                    />
+                                    {selectedCategory === "total-expenses" ? (
+                                        <Line
+                                            type="monotone"
+                                            dataKey="Total Expenses"
+                                            stroke="#3b82f6"
+                                            strokeWidth={2}
+                                            dot={{ r: 3 }}
+                                            activeDot={{ r: 5 }}
+                                        />
+                                    ) : (
+                                        categories
+                                            .filter((cat) => cat.id === selectedCategory)
+                                            .map((cat) => (
+                                                <Line
+                                                    key={cat.id}
+                                                    type="monotone"
+                                                    dataKey={cat.name}
+                                                    stroke={cat.color ?? "#94a3b8"}
+                                                    strokeWidth={2}
+                                                    dot={{ r: 3 }}
+                                                    activeDot={{ r: 5 }}
+                                                />
+                                            ))
+                                    )}
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
                 </div>
             )}
 

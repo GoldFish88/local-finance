@@ -137,16 +137,25 @@ function UploadCard({ upload, transactions, categoryMap, onDelete }: UploadCardP
                 </span>
               </div>
 
-              {/* Small Donut Chart indicator */}
-              {stats.breakdown.length > 0 && stats.conicStops && (
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                  style={{ background: `conic-gradient(${stats.conicStops})` }}
-                  title="Expense breakdown"
+              {/* Small Donut Chart indicator and link */}
+              <div className="flex flex-col items-end gap-2">
+                {stats.breakdown.length > 0 && stats.conicStops && (
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                    style={{ background: `conic-gradient(${stats.conicStops})` }}
+                    title="Expense breakdown"
+                  >
+                    <div className="w-[1.125rem] h-[1.125rem] rounded-full bg-card" />
+                  </div>
+                )}
+                <Link
+                  href="/categories"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[10px] text-primary hover:underline"
                 >
-                  <div className="w-[1.125rem] h-[1.125rem] rounded-full bg-card" />
-                </div>
-              )}
+                  More insights →
+                </Link>
+              </div>
             </div>
           )}
         </CardContent>

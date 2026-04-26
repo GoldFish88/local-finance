@@ -98,6 +98,49 @@ async def create_category(
     return CategoryRead.model_validate(cat)
 
 
+@router.get("/categories/spending")
+async def get_all_categories_spending(db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """
+    Return monthly spending aggregated by category.
+    Returns list of {category_id, category_name, color, reporting_rule, month, amount}.
+    """
+    from sqlalchemy import text as sa_text
+
+    rows = (
+        await db.execute(
+            sa_text(
+                """
+                SELECT
+                    c.id AS category_id,
+                    c.name AS category_name,
+                    c.color,
+                    c.reporting_rule,
+                    TO_CHAR(t.date, 'YYYY-MM') AS month,
+                    SUM(COALESCE(t.override_amount, t.amount)) AS total_amount
+                FROM transactions t
+                JOIN categories c ON t.category_id = c.id
+                JOIN statement_uploads u ON t.upload_id = u.id
+                WHERE u.archived_at IS NULL
+                GROUP BY c.id, c.name, c.color, c.reporting_rule, TO_CHAR(t.date, 'YYYY-MM')
+                ORDER BY month ASC, c.name ASC
+                """
+            )
+        )
+    ).fetchall()
+
+    return [
+        {
+            "category_id": str(r.category_id),
+            "category_name": r.category_name,
+            "color": r.color,
+            "reporting_rule": r.reporting_rule,
+            "month": r.month,
+            "amount": float(r.total_amount),
+        }
+        for r in rows
+    ]
+
+
 @router.patch("/categories/{category_id}", response_model=CategoryRead)
 async def update_category(
     category_id: uuid.UUID,

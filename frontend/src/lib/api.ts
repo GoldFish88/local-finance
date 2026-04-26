@@ -115,6 +115,16 @@ export const api = {
       `/categories/${id}/examples`
     ),
 
+  getCategoriesSpending: () =>
+    apiFetch<{
+      category_id: string
+      category_name: string
+      color: string | null
+      reporting_rule: string
+      month: string
+      amount: number
+    }[]>("/categories/spending"),
+
   createCategory: (body: CategoryCreate) =>
     apiFetch<Category>("/categories", {
       method: "POST",
